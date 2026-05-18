@@ -1,0 +1,654 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>하이록스 기록 분석</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Noto+Sans+KR:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  :root {
+    --bg: #0d0d0d;
+    --surface: #161616;
+    --surface2: #1e1e1e;
+    --border: rgba(255,255,255,0.08);
+    --border-hover: rgba(255,255,255,0.18);
+    --text: #f0ede8;
+    --muted: #888;
+    --accent: #e8ff47;
+    --accent-dim: rgba(232,255,71,0.12);
+    --green: #4ade80;
+    --green-dim: rgba(74,222,128,0.12);
+    --red: #fb7185;
+    --red-dim: rgba(251,113,133,0.12);
+    --blue: #60a5fa;
+    --blue-dim: rgba(96,165,250,0.12);
+    --radius: 12px;
+    --radius-sm: 8px;
+  }
+  html { scroll-behavior: smooth; }
+  body { background: var(--bg); color: var(--text); font-family: 'Noto Sans KR', sans-serif; font-size: 15px; line-height: 1.6; min-height: 100vh; }
+
+  .site-header { border-bottom: 1px solid var(--border); padding: 18px 24px; display: flex; align-items: center; gap: 12px; position: sticky; top: 0; background: rgba(13,13,13,0.94); backdrop-filter: blur(12px); z-index: 100; }
+  .logo { font-family: 'Bebas Neue', sans-serif; font-size: 26px; letter-spacing: 0.04em; color: var(--accent); line-height: 1; }
+  .logo-sub { font-size: 12px; color: var(--muted); font-weight: 400; }
+  .header-right { margin-left: auto; display: flex; align-items: center; gap: 8px; }
+  .total-display { font-family: 'Bebas Neue', sans-serif; font-size: 30px; letter-spacing: 0.06em; color: var(--text); }
+  .rank-pill { font-size: 11px; font-weight: 700; padding: 3px 10px; border-radius: 100px; background: var(--surface2); color: var(--muted); transition: all 0.3s; }
+  .rank-pill.r1 { background: rgba(232,255,71,0.15); color: var(--accent); }
+  .rank-pill.rtop { background: var(--green-dim); color: var(--green); }
+  .rank-pill.rmid { background: var(--blue-dim); color: var(--blue); }
+  .rank-pill.rlow { background: var(--red-dim); color: var(--red); }
+
+  .main { max-width: 640px; margin: 0 auto; padding: 28px 20px 80px; }
+
+  .card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 20px; margin-bottom: 16px; }
+  .card-title { font-size: 11px; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; color: var(--muted); margin-bottom: 14px; }
+
+  .info-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .field { display: flex; flex-direction: column; gap: 5px; }
+  .field label { font-size: 12px; color: var(--muted); }
+  .field input, .field select { height: 42px; border-radius: var(--radius-sm); border: 1px solid var(--border); background: var(--surface2); color: var(--text); padding: 0 12px; font-size: 14px; font-family: 'Noto Sans KR', sans-serif; width: 100%; -webkit-appearance: none; }
+  .field input:focus, .field select:focus { outline: none; border-color: var(--accent); }
+  .field select option { background: #1e1e1e; }
+
+  /* VERIFY */
+  .verify-row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 10px; }
+  .verify-box { background: var(--surface2); border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 12px 14px; }
+  .verify-label { font-size: 11px; color: var(--muted); margin-bottom: 4px; }
+  .verify-val { font-family: 'Bebas Neue', sans-serif; font-size: 26px; letter-spacing: 0.05em; color: var(--text); }
+  .verify-diff { margin-top: 10px; padding: 10px 14px; border-radius: var(--radius-sm); font-size: 13px; font-weight: 500; display: none; }
+  .verify-diff.show { display: block; background: var(--red-dim); color: var(--red); border: 1px solid rgba(251,113,133,0.2); }
+
+  .section-label { font-size: 11px; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; color: var(--muted); margin: 28px 0 12px; }
+
+  .stage { animation: fadeIn 0.3s ease both; }
+  @keyframes fadeIn { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+
+  /* RUN CARD */
+  .run-card { background: #111; border: 1px solid var(--border); border-radius: var(--radius); padding: 14px 16px; display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 8px; }
+  .run-left { display: flex; align-items: center; gap: 10px; }
+  .run-icon { width: 34px; height: 34px; border-radius: 8px; background: rgba(232,255,71,0.08); display: flex; align-items: center; justify-content: center; font-size: 16px; flex-shrink: 0; }
+  .run-label { font-size: 14px; color: var(--text); }
+  .run-sub { font-size: 11px; color: var(--muted); margin-top: 1px; }
+
+  /* EX CARD */
+  .ex-card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 16px; margin-bottom: 8px; transition: border-color 0.2s; }
+  .ex-card:focus-within { border-color: var(--border-hover); }
+  .ex-top { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 12px; }
+  .ex-left { display: flex; align-items: center; gap: 10px; }
+  .ex-icon { width: 38px; height: 38px; border-radius: 10px; background: var(--surface2); border: 1px solid var(--border); display: flex; align-items: center; justify-content: center; font-size: 18px; flex-shrink: 0; }
+  .ex-label { font-size: 15px; font-weight: 500; color: var(--text); }
+  .ex-sub { font-size: 12px; color: var(--muted); margin-top: 2px; }
+  .stage-num { font-size: 10px; font-weight: 700; color: var(--muted); letter-spacing: 0.08em; text-transform: uppercase; margin-bottom: 2px; }
+  .inner-divider { border: none; border-top: 1px solid var(--border); margin: 12px 0; }
+
+  /* TOGGLES */
+  .toggle-row { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+  .toggle-label { font-size: 11px; color: var(--muted); margin-right: 2px; flex-shrink: 0; white-space: nowrap; }
+  .tog-btn { font-size: 12px; padding: 5px 12px; border-radius: 100px; border: 1px solid var(--border); background: transparent; color: var(--muted); cursor: pointer; font-family: 'Noto Sans KR', sans-serif; transition: all 0.15s; white-space: nowrap; }
+  .tog-btn:hover { border-color: var(--border-hover); color: var(--text); }
+  .tog-btn.active { background: var(--accent-dim); border-color: var(--accent); color: var(--accent); font-weight: 500; }
+  .strat-custom { font-size: 12px; padding: 5px 10px; height: 30px; border-radius: 100px; border: 1px solid var(--border); background: transparent; color: var(--text); font-family: 'Noto Sans KR', sans-serif; width: 110px; }
+  .strat-custom::placeholder { color: var(--muted); }
+  .strat-custom:focus { outline: none; border-color: var(--border-hover); }
+
+  /* PARTNER REPS */
+  .partner-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 10px; }
+  .partner-field { display: flex; flex-direction: column; gap: 5px; }
+  .partner-label { font-size: 11px; color: var(--muted); }
+  .partner-input-row { display: flex; align-items: center; gap: 7px; }
+  .partner-input { width: 72px; height: 38px; border-radius: var(--radius-sm); border: 1px solid var(--border); background: var(--surface2); color: var(--text); text-align: center; font-size: 18px; font-family: 'Bebas Neue', sans-serif; letter-spacing: 0.04em; padding: 0; -moz-appearance: textfield; }
+  .partner-input::-webkit-outer-spin-button, .partner-input::-webkit-inner-spin-button { -webkit-appearance: none; }
+  .partner-input:focus { outline: none; border-color: var(--accent); }
+  .partner-unit { font-size: 12px; color: var(--muted); }
+  .rep-check { font-size: 12px; margin-top: 8px; font-weight: 500; min-height: 16px; }
+  .rep-check.ok { color: var(--green); }
+  .rep-check.over { color: var(--red); }
+  .rep-check.under { color: var(--muted); }
+
+  /* TIME INPUT - larger */
+  .time-inputs { display: flex; align-items: center; gap: 5px; flex-shrink: 0; }
+  .time-inputs input {
+    width: 58px; height: 48px;
+    border-radius: var(--radius-sm); border: 1px solid var(--border);
+    background: var(--surface2); color: var(--text);
+    text-align: center; font-size: 22px;
+    font-family: 'Bebas Neue', sans-serif; letter-spacing: 0.05em; padding: 0;
+    -moz-appearance: textfield;
+  }
+  .time-inputs input::-webkit-outer-spin-button, .time-inputs input::-webkit-inner-spin-button { -webkit-appearance: none; }
+  .time-inputs input:focus { outline: none; border-color: var(--accent); }
+  .time-sep { font-size: 22px; color: var(--muted); font-family: 'Bebas Neue', sans-serif; line-height: 1; }
+
+  /* actual time uses same size */
+  .actual-time-inputs input { width: 64px; height: 54px; font-size: 26px; }
+  .actual-time-inputs .time-sep { font-size: 26px; }
+
+  .connector { display: flex; align-items: center; justify-content: center; height: 12px; position: relative; }
+  .connector::before { content: ''; position: absolute; left: 50%; top: 0; bottom: 0; width: 1px; background: var(--border); }
+  .connector-dot { width: 5px; height: 5px; border-radius: 50%; background: var(--border); position: relative; z-index: 1; }
+
+  /* BUTTONS */
+  .submit-btn {
+    height: 52px; background: var(--accent); color: #0d0d0d;
+    border: none; border-radius: var(--radius); font-size: 15px; font-weight: 700;
+    font-family: 'Noto Sans KR', sans-serif; cursor: pointer; display: flex; align-items: center;
+    justify-content: center; gap: 8px; transition: opacity 0.2s, transform 0.1s;
+  }
+  .submit-btn:hover { opacity: 0.9; }
+  .submit-btn:active { transform: scale(0.99); }
+  .submit-btn:disabled { opacity: 0.35; cursor: not-allowed; transform: none; }
+
+
+
+  /* FEEDBACK */
+  .feedback-box { margin-top: 24px; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden; animation: fadeIn 0.4s ease; }
+  .feedback-header { padding: 14px 20px; border-bottom: 1px solid var(--border); font-size: 12px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: var(--accent); }
+  .feedback-content { padding: 20px; font-size: 14px; line-height: 1.9; color: var(--text); white-space: pre-wrap; }
+  .feedback-content.loading { color: var(--muted); }
+
+  .dots { display: inline-flex; gap: 5px; align-items: center; }
+  .dots span { width: 6px; height: 6px; border-radius: 50%; background: var(--muted); animation: dp 1.2s infinite; }
+  .dots span:nth-child(2) { animation-delay: .2s; }
+  .dots span:nth-child(3) { animation-delay: .4s; }
+  @keyframes dp { 0%,80%,100%{opacity:.2} 40%{opacity:1} }
+  .err-text { color: var(--red); font-size: 13px; }
+
+  @media (max-width: 480px) {
+    .info-grid { grid-template-columns: 1fr; }
+    .verify-row { grid-template-columns: 1fr; }
+    .partner-grid { grid-template-columns: 1fr; }
+    .total-display { font-size: 24px; }
+  }
+</style>
+</head>
+<body>
+
+<header class="site-header">
+  <div>
+    <div class="logo">HYROX</div>
+    <div class="logo-sub">기록 분석 시스템</div>
+  </div>
+  <div class="header-right">
+    <div class="total-display" id="total-display">--:--</div>
+    <div class="rank-pill" id="rank-pill">-</div>
+  </div>
+</header>
+
+<main class="main">
+
+  <div class="card">
+    <div class="card-title">팀 정보</div>
+    <div class="info-grid">
+      <div class="field"><label>파트너 1 이름</label><input type="text" id="p1name" placeholder="홍길동"></div>
+      <div class="field"><label>파트너 2 이름</label><input type="text" id="p2name" placeholder="김철수"></div>
+      <div class="field">
+        <label>반</label>
+        <select id="teamname">
+          <option value="">선택하세요</option>
+          <option value="1,5반">1, 5반</option>
+          <option value="2,6반">2, 6반</option>
+          <option value="3,7반">3, 7반</option>
+          <option value="4,8반">4, 8반</option>
+        </select>
+      </div>
+      <div class="field">
+        <label>성별</label>
+        <select id="gender">
+          <option value="male">남성 2인</option>
+          <option value="female">여성 2인</option>
+        </select>
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-title">전체 기록 확인</div>
+    <div class="field">
+      <label>실제 완주 기록 (스톱워치 기준)</label>
+      <div style="margin-top:6px;">
+        <div class="time-inputs actual-time-inputs">
+          <input type="number" id="actual_m" placeholder="00" min="0" max="59">
+          <span class="time-sep">:</span>
+          <input type="number" id="actual_s" placeholder="00" min="0" max="59">
+        </div>
+      </div>
+    </div>
+    <div class="verify-row">
+      <div class="verify-box">
+        <div class="verify-label">구간 합계</div>
+        <div class="verify-val" id="sum-display">--:--</div>
+      </div>
+      <div class="verify-box">
+        <div class="verify-label">실제 기록</div>
+        <div class="verify-val" id="actual-display">--:--</div>
+      </div>
+    </div>
+    <div class="verify-diff" id="verify-diff"></div>
+  </div>
+
+  <div class="section-label">구간별 기록 및 전략</div>
+  <div id="stages-container"></div>
+
+  <input type="hidden" id="webhook-url" value="https://script.google.com/macros/s/AKfycbx5l0auEVEzk3B2kHrVAm2jLu3uHajG1_NG_p4SLlS0ZyaZ4JtWUdC5pTIKSBZ-lq2p/exec">
+  <div id="sheet-status" class="sheet-status" style="margin-top:10px;text-align:center;"></div>
+
+  <div style="margin-top:28px;">
+    <button class="submit-btn" id="submit-btn" style="width:100%;">✦ AI 피드백 받기</button>
+  </div>
+
+  <div class="feedback-box" id="feedback-box" style="display:none;">
+    <div class="feedback-header">AI 분석 결과</div>
+    <div class="feedback-content" id="feedback-content"></div>
+  </div>
+
+</main>
+
+<script>
+const COURSE = [
+  {type:"run", id:"run1", label:"200m 달리기", sub:"2인 함께", icon:"🏃"},
+  {type:"ex",  id:"pushup", label:"푸시업", icon:"💪",
+    strategies:["동시에","교대 5개씩","교대 10개씩","한명 전담"],
+    hasPushupType:true, repUnit:"개"},
+  {type:"run", id:"run2", label:"200m 달리기", sub:"2인 함께", icon:"🏃"},
+  {type:"ex",  id:"broad", label:"브로드점프", sub:"40m", icon:"⬆️",
+    strategies:["동시에","교대로","한명 전담"], repUnit:"m"},
+  {type:"run", id:"run3", label:"200m 달리기", sub:"2인 함께", icon:"🏃"},
+  {type:"ex",  id:"burpee", label:"버피", sub:"40개", icon:"⚡",
+    strategies:["동시에","교대 5개씩","교대 10개씩","한명 전담"], repUnit:"개", repTarget:40},
+  {type:"run", id:"run4", label:"200m 달리기", sub:"2인 함께", icon:"🏃"},
+  {type:"ex",  id:"jump_rope", label:"줄넘기", sub:"300개", icon:"🔄",
+    strategies:["동시에","교대 50개씩","교대 100개씩","한명 전담"], repUnit:"개", repTarget:300},
+  {type:"run", id:"run5", label:"200m 달리기", sub:"2인 함께", icon:"🏃"},
+  {type:"ex",  id:"lunge", label:"중량 런지", sub:"40m", icon:"🦵",
+    strategies:["동시에","교대로","한명 전담"], repUnit:"m"},
+  {type:"run", id:"run6", label:"200m 달리기", sub:"2인 함께", icon:"🏃"},
+  {type:"ex",  id:"squat", label:"농구공 스쿼트", sub:"50개", icon:"🏀",
+    strategies:["동시에","교대 10개씩","교대 25개씩","한명 전담"], repUnit:"개", repTarget:50},
+];
+
+const selectedStrategies = {};
+const pushupType = { value: "normal" };
+const container = document.getElementById("stages-container");
+
+function getPushupTarget() { return pushupType.value === "normal" ? 30 : 40; }
+
+COURSE.forEach((s, i) => {
+  if (i > 0) {
+    const conn = document.createElement("div");
+    conn.className = "connector";
+    conn.innerHTML = `<div class="connector-dot"></div>`;
+    container.appendChild(conn);
+  }
+
+  const wrap = document.createElement("div");
+  wrap.className = "stage";
+  wrap.style.animationDelay = (i * 0.03) + "s";
+  const stageNum = i + 1;
+
+  if (s.type === "run") {
+    wrap.innerHTML = `
+      <div class="run-card">
+        <div class="run-left">
+          <div class="run-icon">${s.icon}</div>
+          <div>
+            <div class="stage-num">구간 ${stageNum}</div>
+            <div class="run-label">${s.label}</div>
+            <div class="run-sub">${s.sub}</div>
+          </div>
+        </div>
+        <div class="time-inputs">
+          <input type="number" id="${s.id}_m" placeholder="00" min="0" max="9">
+          <span class="time-sep">:</span>
+          <input type="number" id="${s.id}_s" placeholder="00" min="0" max="59">
+        </div>
+      </div>`;
+  } else {
+    selectedStrategies[s.id] = s.strategies[0];
+    const opts = s.strategies.map(st =>
+      `<button class="tog-btn${st === s.strategies[0] ? ' active' : ''}" data-id="${s.id}" data-val="${st}">${st}</button>`
+    ).join("");
+
+    const pushupToggleHTML = s.hasPushupType ? `
+      <hr class="inner-divider">
+      <div class="toggle-row">
+        <span class="toggle-label">종류</span>
+        <button class="tog-btn active" id="pt-normal" data-pt="normal">일반 30개</button>
+        <button class="tog-btn" id="pt-knee" data-pt="knee">무릎 40개</button>
+      </div>` : '';
+
+    const hasTarget = s.repTarget || s.hasPushupType;
+    const repCheckHTML = hasTarget ? `<div class="rep-check" id="${s.id}_repcheck"></div>` : '';
+
+    wrap.innerHTML = `
+      <div class="ex-card">
+        <div class="ex-top">
+          <div class="ex-left">
+            <div class="ex-icon">${s.icon}</div>
+            <div>
+              <div class="stage-num">구간 ${stageNum}</div>
+              <div class="ex-label">${s.label}</div>
+              ${s.sub ? `<div class="ex-sub">${s.sub}</div>` : ''}
+            </div>
+          </div>
+          <div class="time-inputs">
+            <input type="number" id="${s.id}_m" placeholder="00" min="0" max="9">
+            <span class="time-sep">:</span>
+            <input type="number" id="${s.id}_s" placeholder="00" min="0" max="59">
+          </div>
+        </div>
+        ${pushupToggleHTML}
+        <hr class="inner-divider">
+        <div class="toggle-row">
+          <span class="toggle-label">전략</span>
+          ${opts}
+          <input class="strat-custom" type="text" placeholder="직접 입력..." data-id="${s.id}">
+        </div>
+        <hr class="inner-divider">
+        <div class="partner-grid">
+          <div class="partner-field">
+            <div class="partner-label" id="${s.id}_p1label">파트너 1 수행량</div>
+            <div class="partner-input-row">
+              <input type="number" class="partner-input" id="${s.id}_p1" placeholder="0" min="0">
+              <span class="partner-unit">${s.repUnit}</span>
+            </div>
+          </div>
+          <div class="partner-field">
+            <div class="partner-label" id="${s.id}_p2label">파트너 2 수행량</div>
+            <div class="partner-input-row">
+              <input type="number" class="partner-input" id="${s.id}_p2" placeholder="0" min="0">
+              <span class="partner-unit">${s.repUnit}</span>
+            </div>
+          </div>
+        </div>
+        ${repCheckHTML}
+      </div>`;
+  }
+  container.appendChild(wrap);
+});
+
+function updatePartnerLabels() {
+  const p1 = document.getElementById("p1name").value.trim() || "파트너 1";
+  const p2 = document.getElementById("p2name").value.trim() || "파트너 2";
+  COURSE.filter(s => s.type === "ex").forEach(s => {
+    const l1 = document.getElementById(s.id + "_p1label");
+    const l2 = document.getElementById(s.id + "_p2label");
+    if (l1) l1.textContent = p1 + " 수행량";
+    if (l2) l2.textContent = p2 + " 수행량";
+  });
+}
+document.getElementById("p1name").addEventListener("input", updatePartnerLabels);
+document.getElementById("p2name").addEventListener("input", updatePartnerLabels);
+
+container.addEventListener("click", e => {
+  if (e.target.classList.contains("tog-btn") && e.target.dataset.id) {
+    const id = e.target.dataset.id;
+    selectedStrategies[id] = e.target.dataset.val;
+    document.querySelectorAll(`.tog-btn[data-id="${id}"]`).forEach(b => b.classList.remove("active"));
+    e.target.classList.add("active");
+    const custom = document.querySelector(`.strat-custom[data-id="${id}"]`);
+    if (custom) custom.value = "";
+  }
+  if (e.target.dataset.pt) {
+    pushupType.value = e.target.dataset.pt;
+    document.getElementById("pt-normal").classList.toggle("active", pushupType.value === "normal");
+    document.getElementById("pt-knee").classList.toggle("active", pushupType.value === "knee");
+    checkReps("pushup");
+  }
+});
+
+container.addEventListener("input", e => {
+  if (e.target.classList.contains("strat-custom")) {
+    const id = e.target.dataset.id;
+    if (e.target.value.trim()) {
+      selectedStrategies[id] = e.target.value.trim();
+      document.querySelectorAll(`.tog-btn[data-id="${id}"]`).forEach(b => b.classList.remove("active"));
+    }
+  }
+  if (e.target.classList.contains("partner-input")) {
+    const parts = e.target.id.split("_");
+    const exId = parts.slice(0, -1).join("_");
+    checkReps(exId);
+  }
+  update();
+});
+
+document.addEventListener("input", update);
+
+function checkReps(exId) {
+  const el = document.getElementById(exId + "_repcheck");
+  if (!el) return;
+  const p1 = parseInt(document.getElementById(exId + "_p1")?.value) || 0;
+  const p2 = parseInt(document.getElementById(exId + "_p2")?.value) || 0;
+  const total = p1 + p2;
+  let target = null;
+  if (exId === "pushup") target = getPushupTarget();
+  else { const s = COURSE.find(c => c.id === exId); target = s?.repTarget || null; }
+  if (!target) { el.textContent = total > 0 ? `합계 ${total}` : ""; el.className = "rep-check under"; return; }
+  if (total === 0) { el.textContent = ""; el.className = "rep-check"; return; }
+  if (total === target) {
+    el.textContent = `✓ 합계 ${total} — 목표 ${target} 달성`;
+    el.className = "rep-check ok";
+  } else if (total > target) {
+    el.textContent = `▲ 합계 ${total} — 목표 ${target}보다 ${total - target} 초과`;
+    el.className = "rep-check over";
+  } else {
+    el.textContent = `▽ 합계 ${total} — 목표 ${target}보다 ${target - total} 부족`;
+    el.className = "rep-check under";
+  }
+}
+
+function getSecs(id) {
+  const m = parseInt(document.getElementById(id + "_m")?.value) || 0;
+  const s = parseInt(document.getElementById(id + "_s")?.value) || 0;
+  return m * 60 + s;
+}
+function fmt(secs) {
+  if (!secs) return "--:--";
+  const m = Math.floor(secs / 60), s = secs % 60;
+  return `${String(m).padStart(2,"0")}:${String(s).padStart(2,"0")}`;
+}
+function getRank(secs) {
+  if (!secs) return { label: "-", cls: "" };
+  if (secs <= 680) return { label: "1위권", cls: "r1" };
+  if (secs <= 840) return { label: "상위 20%", cls: "rtop" };
+  if (secs <= 960) return { label: "중위권", cls: "rmid" };
+  return { label: "하위권", cls: "rlow" };
+}
+
+function update() {
+  let sum = 0;
+  COURSE.forEach(s => { sum += getSecs(s.id); });
+  const am = parseInt(document.getElementById("actual_m")?.value) || 0;
+  const as_ = parseInt(document.getElementById("actual_s")?.value) || 0;
+  const actual = am * 60 + as_;
+
+  document.getElementById("sum-display").textContent = sum > 0 ? fmt(sum) : "--:--";
+  document.getElementById("actual-display").textContent = actual > 0 ? fmt(actual) : "--:--";
+  document.getElementById("total-display").textContent = actual > 0 ? fmt(actual) : (sum > 0 ? fmt(sum) : "--:--");
+
+  const r = getRank(actual || sum);
+  const pill = document.getElementById("rank-pill");
+  pill.textContent = r.label; pill.className = "rank-pill " + r.cls;
+
+  const vd = document.getElementById("verify-diff");
+  if (sum > 0 && actual > 0 && sum !== actual) {
+    const diff = Math.abs(sum - actual);
+    const who = sum > actual ? "구간 합계" : "실제 기록";
+    vd.textContent = `${who}가 ${fmt(diff)} 더 깁니다`;
+    vd.className = "verify-diff show";
+  } else {
+    vd.className = "verify-diff";
+  }
+}
+
+function collectData() {
+  const p1 = document.getElementById("p1name").value.trim() || "파트너1";
+  const p2 = document.getElementById("p2name").value.trim() || "파트너2";
+  const team = document.getElementById("teamname").value.trim() || "";
+  const gender = { male:"남성 2인", female:"여성 2인" }[document.getElementById("gender").value];
+  const am = parseInt(document.getElementById("actual_m")?.value) || 0;
+  const as_ = parseInt(document.getElementById("actual_s")?.value) || 0;
+  const actual = am * 60 + as_;
+  let sum = 0; COURSE.forEach(s => { sum += getSecs(s.id); });
+
+  const data = {
+    team, p1, p2, gender,
+    actual: fmt(actual), sum: fmt(sum), diffSecs: actual && sum ? actual - sum : 0,
+    run1: fmt(getSecs("run1")), run2: fmt(getSecs("run2")), run3: fmt(getSecs("run3")),
+    run4: fmt(getSecs("run4")), run5: fmt(getSecs("run5")), run6: fmt(getSecs("run6")),
+    pushupType: pushupType.value === "normal" ? "일반 30개" : "무릎 40개",
+    pushupTime: fmt(getSecs("pushup")),
+    pushupStrat: selectedStrategies["pushup"],
+    pushupP1: parseInt(document.getElementById("pushup_p1")?.value) || 0,
+    pushupP2: parseInt(document.getElementById("pushup_p2")?.value) || 0,
+  };
+
+  ["broad","burpee","jump_rope","lunge","squat"].forEach(id => {
+    data[id + "Time"] = fmt(getSecs(id));
+    data[id + "Strat"] = selectedStrategies[id];
+    data[id + "P1"] = parseInt(document.getElementById(id + "_p1")?.value) || 0;
+    data[id + "P2"] = parseInt(document.getElementById(id + "_p2")?.value) || 0;
+  });
+
+  return { data, p1, p2, team, gender, actual, sum };
+}
+
+
+
+// AI FEEDBACK
+document.getElementById("submit-btn").addEventListener("click", async () => {
+  const { data, p1, p2, team, gender, actual, sum } = collectData();
+  const teamLabel = team ? `${team} (${p1} + ${p2})` : `${p1} + ${p2}`;
+  const totalStr = actual > 0 ? fmt(actual) : (sum > 0 ? fmt(sum) : "미입력");
+  const rank = getRank(actual || sum).label;
+
+  const runRows = COURSE.filter(s => s.type === "run").map((s, i) =>
+    `  달리기 ${i+1}구간: ${getSecs(s.id) > 0 ? fmt(getSecs(s.id)) : "미입력"}`
+  ).join("\n");
+
+  const exRows = COURSE.filter(s => s.type === "ex").map(s => {
+    const secs = getSecs(s.id);
+    const r1 = parseInt(document.getElementById(s.id + "_p1")?.value) || 0;
+    const r2 = parseInt(document.getElementById(s.id + "_p2")?.value) || 0;
+    let typeNote = s.id === "pushup" ? ` [${data.pushupType}]` : "";
+    const repNote = (r1 || r2) ? ` / ${p1} ${r1}${s.repUnit}, ${p2} ${r2}${s.repUnit} (합계 ${r1+r2}${s.repUnit})` : "";
+    const target = s.id === "pushup" ? getPushupTarget() : (s.repTarget || null);
+    const targetNote = target ? ` / 목표 ${target}${s.repUnit}` : "";
+    return `  ${s.label}${typeNote}: ${secs > 0 ? fmt(secs) : "미입력"} / 전략: ${selectedStrategies[s.id]}${repNote}${targetNote}`;
+  }).join("\n");
+
+  const btn = document.getElementById("submit-btn");
+  const box = document.getElementById("feedback-box");
+  const content = document.getElementById("feedback-content");
+  btn.disabled = true;
+  btn.textContent = "분석 중...";
+  box.style.display = "block";
+  box.scrollIntoView({ behavior: "smooth", block: "start" });
+  content.className = "feedback-content loading";
+  content.innerHTML = `<div class="dots"><span></span><span></span><span></span></div>`;
+
+  // compute individual stats for personalized feedback
+  const runTimes = COURSE.filter(s => s.type === "run").map(s => getSecs(s.id));
+  const exItems = COURSE.filter(s => s.type === "ex");
+  const slowestRun = Math.max(...runTimes.filter(t => t > 0));
+  const fastestRun = Math.min(...runTimes.filter(t => t > 0));
+  const runDrop = slowestRun && fastestRun ? slowestRun - fastestRun : 0;
+
+  // per-partner total reps across all exercises
+  let p1TotalReps = 0, p2TotalReps = 0;
+  exItems.forEach(s => {
+    p1TotalReps += parseInt(document.getElementById(s.id + "_p1")?.value) || 0;
+    p2TotalReps += parseInt(document.getElementById(s.id + "_p2")?.value) || 0;
+  });
+  const repImbalance = Math.abs(p1TotalReps - p2TotalReps);
+  const heavierPartner = p1TotalReps >= p2TotalReps ? p1 : p2;
+  const lighterPartner = p1TotalReps >= p2TotalReps ? p2 : p1;
+
+  // slowest exercise
+  const exWithTimes = exItems.map(s => ({ label: s.label, secs: getSecs(s.id), id: s.id })).filter(e => e.secs > 0);
+  exWithTimes.sort((a, b) => b.secs - a.secs);
+  const slowestEx = exWithTimes[0];
+  const fastestEx = exWithTimes[exWithTimes.length - 1];
+
+  // pushup note
+  const pushupNote = pushupType.value === "normal" ? "일반(30개)" : "무릎대고(40개)";
+
+  const prompt = `당신은 학교 체육대회 하이록스 전문 코치입니다. 두 학생의 데이터를 깊이 분석해 이름을 자주 불러가며 완전히 개별화된 피드백을 한국어로 작성하세요. 일반적인 조언이 아니라 이 팀의 숫자와 패턴에만 근거한 구체적 진단이어야 합니다.
+
+[대회 규칙]
+- 달리기 200m x 6구간: 2인 항상 함께 달림 (느린 사람 기준)
+- 근력 6종목: 번갈아 수행 / 동시에=개수 2배속 / 교대N개씩 / 한명전담
+- 코스: 달리기->푸시업->달리기->브로드점프->달리기->버피->달리기->줄넘기->달리기->런지->달리기->스쿼트
+- 기준: 1위 11:20 / 상위20% 13분대 / 중위 15분대 / 하위 18분대
+
+[팀 데이터]
+- 이름: ${p1} + ${p2} (${team}반, ${gender})
+- 총 기록: ${totalStr} → ${rank}
+- 달리기 최고: ${fmt(fastestRun)} / 최저: ${fmt(slowestRun)} / 낙폭: ${runDrop}초
+- ${p1} 총 수행량: ${p1TotalReps}회, ${p2} 총 수행량: ${p2TotalReps}회 (불균형 ${repImbalance}회)
+- 가장 느린 종목: ${slowestEx ? slowestEx.label + ' ' + fmt(slowestEx.secs) : '없음'}
+- 가장 빠른 종목: ${fastestEx ? fastestEx.label + ' ' + fmt(fastestEx.secs) : '없음'}
+- 푸시업 선택: ${pushupNote}
+
+[달리기 구간 기록]
+${runRows}
+
+[근력 종목별 기록, 전략, 파트너 수행량]
+${exRows}
+
+다음 5개 섹션으로 작성. 각 섹션 앞에 이모지 + 번호 + 제목. 반드시 실제 숫자(시간, 개수, 초)를 인용해서 진단하세요:
+
+1. 🏁 총평 — ${p1}와 ${p2}의 기록(${totalStr})이 기준 대비 어느 수준인지, 팀의 가장 큰 강점 1가지
+2. 🏃 달리기 분석 — 6구간 중 특히 느려진 구간과 낙폭(${runDrop}초)의 의미, 두 사람 페이스 유지 전략
+3. 💪 근력 약점 — 가장 느린 종목(${slowestEx ? slowestEx.label : ''})에서 시간이 걸린 구체적 이유와 개선법
+4. ⚖️ 분담 & 전략 평가 — ${heavierPartner}이 ${repImbalance}회 더 많이 한 불균형이 후반 달리기에 미친 영향, 종목별 전략 변경 제안
+5. 🎯 다음 대회 핵심 조언 — ${p1}과 ${p2} 각각에게 한 가지씩 + 팀 전략 1가지, 총 3가지
+
+총 600-700자. 숫자 없이 모호하게 쓰지 말 것.`;
+
+  const sheetUrl = document.getElementById("webhook-url").value.trim();
+  const st = document.getElementById("sheet-status");
+
+  // add computed stats
+  data.rank = rank;
+  data.fastestRun = fastestRun > 0 ? fmt(fastestRun) : "미입력";
+  data.slowestRun = slowestRun > 0 ? fmt(slowestRun) : "미입력";
+  data.runDrop = runDrop;
+  data.p1TotalReps = p1TotalReps;
+  data.p2TotalReps = p2TotalReps;
+  data.slowestEx = slowestEx ? slowestEx.label + " " + fmt(slowestEx.secs) : "";
+
+  // Apps Script 단일 호출 — 시트 저장 + Claude 피드백 모두 처리
+  const heavierPartner = p1TotalReps >= p2TotalReps ? p1 : p2;
+  const repImbalance = Math.abs(p1TotalReps - p2TotalReps);
+
+  try {
+    const res = await fetch(sheetUrl, {
+      method: "POST",
+      headers: { "Content-Type": "text/plain" },
+      body: JSON.stringify(data)
+    });
+    const d = await res.json();
+    if (d.feedback) {
+      content.className = "feedback-content";
+      content.textContent = d.feedback;
+      st.textContent = "✓ 기록이 스프레드시트에 저장되었습니다";
+      st.className = "sheet-status ok";
+    } else {
+      content.className = "feedback-content";
+      content.innerHTML = `<span class="err-text">피드백을 불러오지 못했습니다: ${d.message || ""}</span>`;
+    }
+  } catch (err) {
+    content.className = "feedback-content";
+    content.innerHTML = `<span class="err-text">오류가 발생했습니다. 잠시 후 다시 시도해주세요.</span>`;
+  }
+
+  btn.disabled = false;
+  btn.textContent = "✦ AI 피드백 받기";
+});
+</script>
+</body>
+</html>
